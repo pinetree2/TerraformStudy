@@ -2,28 +2,23 @@ provider "aws" {
  region = "ap-northeast-2"
 }
 
-resource "aws_db_instance" "example" {
- identifier_prefix = "terraform-mysql"
- engine = "mysql"
- allocated_storage = 10
- instance_class = "db.t2.micro"
- skip_final_snapshot = true
- db_name = "example_database"
- # How should we set the username and password?
- username = var.db_username
- password = var.db_password
+# 모듈로 지정 
+module "webserver-cluster" {
+# 현재위치가 stage/services/webserver-cluster 니까 .. 이 3개지 
+  source = "../../../module/services/webserver-cluster"
+  server_port = 80
+  cluster_name = "webservers-stage"
+  db_remote_state_bucket = "terraform-state-cloudwave-ssong"
+  db_remote_state_key = "stage/data-stores/mysql/terraform.tfstate"
+  min_size = 2
+  max_size = 2
 }
 
-
-
-terraform {
- backend "s3" {
- # Replace this with your bucket name!
- bucket = "terraform-state-cloudwave-ssong"
- key = "stage/data-stores/mysql/terraform.tfstate"
- region = "ap-northeast-2"
- # Replace this with your DynamoDB table name!
- dynamodb_table = "terraform-locks"
- encrypt = true
- }
+resource "aws_security_group_rule" "allow_testing_inbound" {
+ type = "ingress"
+ security_group_id = module.webserver_cluster.alb_security_group_id
+ from_port = 12345
+ to_port = 12345 # 스테이지에서는 테스트 할 수 있는 포트를 따로 지정해서 관리 
+ protocol = "tcp"
+ cidr_blocks = ["0.0.0.0/0"]
 }
